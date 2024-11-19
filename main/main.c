@@ -1,106 +1,19 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
+#include "usb_hid.h"
+#include "ble_mesh.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "freertos/queue.h"
+static ps4_data_t ps4_data;
 
-#include "esp_err.h"
-#include "esp_log.h"
-#include "usb/usb_host.h"
-#include "errno.h"
-#include "driver/gpio.h"
+#define APP_QUIT_PIN GPIO_NUM_0
 
-#include "usb/hid_host.h"
-#include "usb/hid_usage_keyboard.h"
-#include "usb/hid_usage_mouse.h"
+static const char *USB_TAG = "PS4_usb";
 
-#include <inttypes.h>
+QueueHandle_t app_event_queue = NULL;
 
-#include "esp_system.h"
+/////////////////////
 
-#include "nvs_flash.h"
-#include "esp_bt.h"
-#include "esp_bit_defs.h"
 
-#include "esp_gap_ble_api.h"
-#include "esp_gatts_api.h"
-#include "esp_bt_defs.h"
-#include "esp_bt_main.h"
-#include "esp_gatt_common_api.h"
 
-#include "sdkconfig.h"
-
-#define GATTS_CHAR_UUID_TEST_A 0xFF01
-#define GATTS_DESCR_UUID_TEST_A 0x3333
-#define GATTS_NUM_HANDLE_TEST_A 4
-
-#define TEST_MANUFACTURER_DATA_LEN 17
-
-#define GATTS_DEMO_CHAR_VAL_LEN_MAX 0x40
-
-#define PREPARE_BUF_MAX_SIZE 1024
-
-#define BLINK_GPIO 48
-
-#define adv_config_flag (1 << 0)
-#define scan_rsp_config_flag (1 << 1)
-
-static const char *TAG = "GATTS_SERVER";
-
-static uint8_t adv_config_done = 0;
-
-static uint8_t char1_str[] = {0x11, 0x22, 0x33};
-static esp_gatt_char_prop_t gatt_property = 0;
-
-static esp_attr_value_t gatts_demo_char1_val =
-    {
-        .attr_max_len = GATTS_DEMO_CHAR_VAL_LEN_MAX,
-        .attr_len = sizeof(char1_str),
-        .attr_value = char1_str,
-};
-
-static uint8_t adv_service_uuid128[16] = {
-    0x12,
-    0x34,
-    0x56,
-    0x78,
-    0x12,
-    0x34,
-    0x56,
-    0x78,
-    0x12,
-    0x34,
-    0x56,
-    0x78,
-    0x9a,
-    0xbc,
-    0xde,
-    0xf0,
-};
-
-// uuid : 45778658-28b4-4302-9ae6-89b4bf9b7a0e
-static uint8_t gatt_serv_uuid128[16] = {
-    0x0e,
-    0x7a,
-    0x9b,
-    0xbf,
-    0xb4,
-    0x89,
-    0xe6,
-    0x9a,
-    0x02,
-    0x43,
-    0xb4,
-    0x28,
-    0x58,
-    0x86,
-    0x77,
-    0x45,
-};
+static uint8_t dev_uuid[16] = {0xdd, 0xdd};
 
 static uint8_t ps4_data[10];
 
@@ -296,9 +209,7 @@ static uint8_t *temp_data[] = {&value};
  * @param[in] event              HID Host interface event
  * @param[in] arg                Pointer to arguments, does not used
  */
-void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle,
-                                 const hid_host_interface_event_t event,
-                                 void *arg)
+void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg)
 {
     uint8_t data[64] = {0};
     size_t data_length = 0;
@@ -314,23 +225,19 @@ void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle,
                                                                   &data_length));
 
         memcpy(&ps4_data, data, sizeof(ps4_data));
-        (*temp_data)++;
-        // printf("%d\n", ps4_data[1]);
-        // hid_host_generic_report_callback(&ps4_data, sizeof(ps4_data_t));
+        printf("%d\n", ps4_data.lt);
 
         break;
     case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
-        ESP_LOGI(USB_TAG, "HID Device, protocol '%s' DISCONNECTED",
-                 hid_proto_name_str[dev_params.proto]);
+        ESP_LOGI(USB_TAG, "HID Device, 'PS4' DISCONNECTED");
+        gpio_set_level(48, 0);
         ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
         break;
     case HID_HOST_INTERFACE_EVENT_TRANSFER_ERROR:
-        ESP_LOGI(USB_TAG, "HID Device, protocol '%s' TRANSFER_ERROR",
-                 hid_proto_name_str[dev_params.proto]);
+        ESP_LOGI(USB_TAG, "HID Device, 'PS4' TRANSFER_ERROR");
         break;
     default:
-        ESP_LOGE(USB_TAG, "HID Device, protocol '%s' Unhandled event",
-                 hid_proto_name_str[dev_params.proto]);
+        ESP_LOGE(USB_TAG, "HID Device, 'PS4' Unhandled event");
         break;
     }
 }
@@ -352,8 +259,8 @@ void hid_host_device_event(hid_host_device_handle_t hid_device_handle,
     switch (event)
     {
     case HID_HOST_DRIVER_EVENT_CONNECTED:
-        ESP_LOGI(USB_TAG, "HID Device, protocol '%s' CONNECTED",
-                 hid_proto_name_str[dev_params.proto]);
+        ESP_LOGI(USB_TAG, "HID Device, PS4 CONNECTED");
+        gpio_set_level(48, 1);
 
         const hid_host_device_config_t dev_config = {
             .callback = hid_host_interface_callback,
@@ -1040,6 +947,6 @@ void app_main_core_0(void *parameter)
 
 void app_main(void)
 {
-    xTaskCreatePinnedToCore(app_main_core_0, "gatt_server", 4096 * 2, NULL, 2, NULL, 0);
-    xTaskCreatePinnedToCore(app_main_core_1, "hid_device", 4096 * 2, NULL, 2, NULL, 1);
+    gpio_set_direction(48, GPIO_MODE_OUTPUT);
+    xTaskCreatePinnedToCore(usb_hid_task, "hid_device", 4096 * 2, NULL, 2, NULL, 1);
 }

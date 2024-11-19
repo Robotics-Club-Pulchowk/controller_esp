@@ -2,9 +2,10 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
+set (EXTRA_COMPONENT_DIRS "./managed_components/")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-project(my_ble_central)
+project(controller_esp)
 
 # add_executable(my_ble_central my_ble_central.c hid_host_example.c)
