@@ -1,4 +1,5 @@
 #include "usb_hid.h"
+#include "ble_mesh.h"
 
 static ps4_data_t ps4_data;
 
@@ -8,6 +9,65 @@ static const char *USB_TAG = "PS4_usb";
 
 QueueHandle_t app_event_queue = NULL;
 
+/////////////////////
+
+static uint8_t dev_uuid[16] = {0xdd, 0xdd};
+
+static esp_ble_mesh_cfg_srv_t config_server = {
+    /* 3 transmissions with 20ms interval */
+    .net_transmit = ESP_BLE_MESH_TRANSMIT(2, 20),
+    .relay = ESP_BLE_MESH_RELAY_DISABLED,
+    .relay_retransmit = ESP_BLE_MESH_TRANSMIT(2, 20),
+    .beacon = ESP_BLE_MESH_BEACON_ENABLED,
+#if defined(CONFIG_BLE_MESH_GATT_PROXY_SERVER)
+    .gatt_proxy = ESP_BLE_MESH_GATT_PROXY_ENABLED,
+#else
+    .gatt_proxy = ESP_BLE_MESH_GATT_PROXY_NOT_SUPPORTED,
+#endif
+#if defined(CONFIG_BLE_MESH_FRIEND)
+    .friend_state = ESP_BLE_MESH_FRIEND_ENABLED,
+#else
+    .friend_state = ESP_BLE_MESH_FRIEND_NOT_SUPPORTED,
+#endif
+    .default_ttl = 7,
+};
+
+ESP_BLE_MESH_MODEL_PUB_DEFINE(ps4_pub, 10 + 3, ROLE_NODE);
+static esp_ble_mesh_gen_onoff_srv_t ps4_server = {
+    .rsp_ctrl = {
+        .get_auto_rsp = ESP_BLE_MESH_SERVER_AUTO_RSP,
+        .set_auto_rsp = ESP_BLE_MESH_SERVER_AUTO_RSP,
+    },
+};
+
+static esp_ble_mesh_model_t models[] = {
+    ESP_BLE_MESH_MODEL_CFG_SRV(&config_server),
+    ESP_BLE_MESH_SIG_MODEL(ESP_BLE_MESH_MODEL_NONE, NULL, &ps4_pub, &ps4_server),
+};
+
+static esp_ble_mesh_elem_t elements[] = {
+    ESP_BLE_MESH_ELEMENT(0, models, ESP_BLE_MESH_MODEL_NONE),
+};
+
+static esp_ble_mesh_comp_t composition = {
+    .cid = CID_ESP,
+    .element_count = ARRAY_SIZE(elements),
+    .elements = elements,
+};
+
+static esp_ble_mesh_prov_t provision = {
+    .uuid = dev_uuid,
+    .output_size = 0,
+    .output_actions = 0,
+};
+
+static void prov_complete(uint16_t net_idx, uint16_t addr, uint8_t flags, uint32_t iv_index)
+{
+    ESP_LOGI(TAG, "net_idx: 0x%04x, addr: 0x%04x", net_idx, addr);
+    ESP_LOGI(TAG, "flags: 0x%02x, iv_index: 0x%08" PRIx32, flags, iv_index);
+};
+
+////////////////////////////
 
 /**
  * @brief USB HID Host interface callback

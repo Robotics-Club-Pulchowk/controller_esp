@@ -1,4 +1,10 @@
 dependencies:
+  button:
+    dependencies: []
+    source:
+      path: /home/utsavxth/repos/esp/esp-idf/examples/bluetooth/esp_ble_mesh/common_components/button
+      type: local
+    version: '*'
   espressif/usb_host_hid:
     component_hash: eabf03fe3cb1bdb5325d2725f420c6324c3e150033d893ce3737222929455a55
     dependencies:
@@ -14,13 +20,26 @@ dependencies:
     - esp32s3
     - esp32p4
     version: 1.0.3
+  example_init:
+    dependencies: []
+    source:
+      path: /home/utsavxth/repos/esp/esp-idf/examples/bluetooth/esp_ble_mesh/common_components/example_init
+      type: local
+    version: '*'
+  example_nvs:
+    dependencies: []
+    source:
+      path: /home/utsavxth/repos/esp/esp-idf/examples/bluetooth/esp_ble_mesh/common_components/example_nvs
+      type: local
+    version: '*'
   idf:
     source:
       type: idf
     version: 5.4.0
 direct_dependencies:
 - espressif/usb_host_hid
+- example_init
 - idf
-manifest_hash: edd401e2e3354349a17102181b072cff3932e95da175424d190059b78fd3b014
+manifest_hash: 748cc419b16dc02d9777490984b3748118d610a9864241fe30215901be52fd07
 target: esp32s3
 version: 2.0.0
